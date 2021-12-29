@@ -41,7 +41,9 @@ int main() {
 		if (!strcmp(input, "quit")) {
 			isPlaying = 0;
 		} else {
-			printf("%s!\n", validateInput(input) ? "PASS" : "FAIL");
+			int command = validateInput(input);
+			printf("command %d\n", command);
+			printf("%s!\n", command ? "PASS" : "FAIL");
 			printf("---------------\n");
 		}
 
@@ -81,9 +83,7 @@ int validateInput(char *str) {
 		str[i] = tolower(str[i]);
 	}
 
-	c = str[0];
-
-	if (c == '0' || c == 'o') {	// "o0" - castling
+	if ((c = str[0]) == '0' || c == 'o') {	// "o0" - castling
 		return validateCastling(str, len);
 	} else if (c >= 'a' && c <= 'h') {	// "abcdefgh" - pawn move
 		return validatePawnMove(str, len);
@@ -100,20 +100,35 @@ int validateInput(char *str) {
 }
 
 int validatePawnMove(char *str, int len) {
-	return (len == 2 && isSquare(str)) || 
-		(len == 4 && str[1] == 'x' && isSquare(&str[2])
-	 );
+	if (len == 2 && isSquare(str)) {
+		return 1;	// pawn move
+	} else if (len == 4 && str[1] == 'x' && isSquare(&str[2])) {
+		return 2;	// pawn capture
+	}
+	return 0;
 }
 
 int validatePieceMove(char *str, int len) {
-	return (len == 3 && isSquare(str)) || 
-		(len == 4 && str[1] == 'x' && isSquare(&str[2])) ||
-		(len == 4 && str[1] >= 'a' && str[1] <= 'h' && isSquare(&str[2]));
+	if ((len == 3 && isSquare(&str[1])) || 
+		(len == 4 && str[1] >= 'a' && str[1] <= 'h' && isSquare(&str[2])) ||
+		(len == 4 && str[1] >= '1' && str[1] <= '8' && isSquare(&str[2]))) {
+		return 3;	// piece move
+	} else if ((str[1] == 'x' && len == 4 && isSquare(&str[2])) ||
+		(str[2] == 'x' &&
+		((len == 5 && str[1] >= 'a' && str[1] <= 'h' && isSquare(&str[3])) ||
+		(len == 5 && str[1] >= '1' && str[1] <= '8' && isSquare(&str[3]))))) {
+		return 4;	// piece capture
+	}
+	return 0;
 }
 
 int validateCastling(char *str, int len) {
-	return !strcmp("o-o", str) || !strcmp("o-o-o", str) ||
-		!strcmp("0-0", str) || !strcmp("0-0-0", str);
+	if (!strcmp("o-o", str) || !strcmp("0-0", str)) {
+		return 5;	// kingside castle
+	} else if (!strcmp("o-o-o", str) || !strcmp("0-0-0", str)) {
+		return 6;	// queenside castle
+	}
+	return 0;
 }
 
 int isSquare(char *str) {
