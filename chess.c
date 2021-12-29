@@ -110,13 +110,14 @@ int validatePawnMove(char *str, int len) {
 
 int validatePieceMove(char *str, int len) {
 	if ((len == 3 && isSquare(&str[1])) || 
-		(len == 4 && str[1] >= 'a' && str[1] <= 'h' && isSquare(&str[2])) ||
-		(len == 4 && str[1] >= '1' && str[1] <= '8' && isSquare(&str[2]))) {
+			(len == 4 && isSquare(&str[2]) &&
+			((str[1] >= 'a' && str[1] <= 'h') ||
+			(str[1] >= '1' && str[1] <= '8')))) {
 		return 3;	// piece move
 	} else if ((str[1] == 'x' && len == 4 && isSquare(&str[2])) ||
-		(str[2] == 'x' &&
-		((len == 5 && str[1] >= 'a' && str[1] <= 'h' && isSquare(&str[3])) ||
-		(len == 5 && str[1] >= '1' && str[1] <= '8' && isSquare(&str[3]))))) {
+			(str[2] == 'x' && len == 5 && isSquare(&str[3]) &&
+			((str[1] >= 'a' && str[1] <= 'h') ||
+			(str[1] >= '1' && str[1] <= '8')))) {
 		return 4;	// piece capture
 	}
 	return 0;
