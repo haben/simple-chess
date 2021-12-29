@@ -112,7 +112,8 @@ int validatePieceMove(char *str, int len) {
 }
 
 int validateCastling(char *str, int len) {
-	return 1;
+	return !strcmp("o-o", str) || !strcmp("o-o-o", str) ||
+		!strcmp("0-0", str) || !strcmp("0-0-0", str);
 }
 
 int isSquare(char *str) {
