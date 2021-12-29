@@ -12,9 +12,9 @@ const char *pieces = "kqrbn";
 void display(char[][FILES]);
 void askMove(int, char *);
 int validateInput(char *);
-int validateCastling(char *);
-int validatePawnMove(char *);
-int validatePieceMove(char *);
+int validateCastling(char *, int);
+int validatePawnMove(char *, int);
+int validatePieceMove(char *, int);
 int isSquare(char *);
 
 
@@ -84,14 +84,14 @@ int validateInput(char *str) {
 	c = str[0];
 
 	if (c == '0' || c == 'o') {	// "o0" - castling
-		return validateCastling(str);
+		return validateCastling(str, len);
 	} else if (c >= 'a' && c <= 'h') {	// "abcdefgh" - pawn move
-		return validatePawnMove(str);
+		return validatePawnMove(str, len);
 	} else {
 		i = 0;
 		while (pieces[i]) {
 			if (c == pieces[i++]) {
-				return validatePieceMove(str);
+				return validatePieceMove(str, len);
 			}
 		}
 	}	
@@ -99,18 +99,19 @@ int validateInput(char *str) {
 	return 0;
 }
 
-int validatePawnMove(char *str) {
-	int len = strlen(str);
-
+int validatePawnMove(char *str, int len) {
 	return (len == 2 && isSquare(str)) || 
-		(len == 4 && str[1] == 'x' && isSquare(&str[2]));
+		(len == 4 && str[1] == 'x' && isSquare(&str[2])
+	 );
 }
 
-int validatePieceMove(char *str) {
-	return 1;
+int validatePieceMove(char *str, int len) {
+	return (len == 3 && isSquare(str)) || 
+		(len == 4 && str[1] == 'x' && isSquare(&str[2])) ||
+		(len == 4 && str[1] >= 'a' && str[1] <= 'h' && isSquare(&str[2]));
 }
 
-int validateCastling(char *str) {
+int validateCastling(char *str, int len) {
 	return 1;
 }
 
