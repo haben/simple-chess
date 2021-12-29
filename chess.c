@@ -1,6 +1,6 @@
 #include <stdio.h>
-#include <string.h>
-#include <ctype.h>
+#include <string.h>	// strlen, strcmp
+#include <ctype.h>	// tolower
 
 #define RANKS 8
 #define FILES 8
@@ -10,11 +10,12 @@ enum player{white, black};
 const char *pieces = "kqrbn";
 
 void display(char[][FILES]);
-void askMove(int, char[MAX_CHAR]);
-int validateInput(char[MAX_CHAR]);
-int validateCastling(char[MAX_CHAR]);
-int validatePawnMove(char[MAX_CHAR]);
-int validatePieceMove(char[MAX_CHAR]);
+void askMove(int, char *);
+int validateInput(char *);
+int validateCastling(char *);
+int validatePawnMove(char *);
+int validatePieceMove(char *);
+int isSquare(char *);
 
 
 int main() {
@@ -76,16 +77,18 @@ int validateInput(char *str) {
 		return 0;
 	} 
 
-	c = str[0];
-	if (isalpha(c)) {
-		c = tolower(c);
+	for (int i = 0; str[i]; i++) {
+		str[i] = tolower(str[i]);
 	}
+
+	c = str[0];
 
 	if (c == '0' || c == 'o') {	// "o0" - castling
 		return validateCastling(str);
 	} else if (c >= 'a' && c <= 'h') {	// "abcdefgh" - pawn move
 		return validatePawnMove(str);
 	} else {
+		i = 0;
 		while (pieces[i]) {
 			if (c == pieces[i++]) {
 				return validatePieceMove(str);
@@ -97,7 +100,10 @@ int validateInput(char *str) {
 }
 
 int validatePawnMove(char *str) {
-	return 1;
+	int len = strlen(str);
+
+	return (len == 2 && isSquare(str)) || 
+		(len == 4 && str[1] == 'x' && isSquare(&str[2]));
 }
 
 int validatePieceMove(char *str) {
@@ -106,4 +112,8 @@ int validatePieceMove(char *str) {
 
 int validateCastling(char *str) {
 	return 1;
+}
+
+int isSquare(char *str) {
+	return str[0] >= 'a' && str[0] <= 'h' && str[1] >= '1' && str[1] <= '8';
 }
