@@ -33,6 +33,8 @@ int main() {
 	int turn = white;
 	char input[MAX_CHAR];
 	int isPlaying = 1;
+	int command;
+	int moves = 1;
 
 	while (isPlaying) {
 		display(board);
@@ -41,12 +43,17 @@ int main() {
 		if (!strcmp(input, "quit")) {
 			isPlaying = 0;
 		} else {
-			int command = validateInput(input);
-			printf("command %d\n", command);
-			printf("%s!\n", command ? "PASS" : "FAIL");
-			printf("---------------\n");
+			if((command = validateInput(input))) {
+				printf("%d.%s%s\n", moves, turn ? ".." : "", input);
+			} else {
+				printf("Invalid input.\n");
+				continue;
+			}
 		}
 
+		if (turn) {
+			moves++;
+		}
 		turn = ++turn % 2;
 	}
 
@@ -54,6 +61,7 @@ int main() {
 }
 
 void display(char board[][FILES]) {
+	printf("---------------\n");
 	for (int i = 0; i < RANKS; i++) {
 		for (int j = 0; j < FILES; j++) {
 			printf("%c ", board[i][j]);
