@@ -1,5 +1,6 @@
 
 #include <stdio.h>
+#include <string.h>
 
 #define RANKS 8
 #define FILES 8
@@ -25,17 +26,25 @@ int main() {
 
 	int turn = white;
 	char input[MAX_CHAR];
+	int isPlaying = 1;
 
-	display(board);
-	askMove(turn, input);
+	while (isPlaying) {
+		display(board);
+		askMove(turn, input);
+		if (!strcmp(input, "quit")) {
+			isPlaying = 0;
+		}
+		turn = ++turn % 2;
+	}
 
 	return 0;
 }
 
 void display(char board[][FILES]) {
 	for (int i = 0; i < RANKS; i++) {
-		for (int j = 0; j < FILES; j++)
+		for (int j = 0; j < FILES; j++) {
 			printf("%c ", board[i][j]);
+		}
 		printf("\n");
 	}
 	printf("\n");
