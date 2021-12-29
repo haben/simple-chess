@@ -1,9 +1,15 @@
+
 #include <stdio.h>
 
 #define RANKS 8
 #define FILES 8
+#define MAX_CHAR 8
+
+
+enum player{white, black};
 
 void display(char[][FILES]);
+void askMove(int, char[MAX_CHAR]);
 
 int main() {
 	char board[RANKS][FILES] = {
@@ -17,7 +23,11 @@ int main() {
 		{'r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'},
 	};
 
+	int turn = white;
+	char input[MAX_CHAR];
+
 	display(board);
+	askMove(turn, input);
 
 	return 0;
 }
@@ -28,4 +38,11 @@ void display(char board[][FILES]) {
 			printf("%c ", board[i][j]);
 		printf("\n");
 	}
+	printf("\n");
+}
+
+void askMove(int turn, char *reply) {
+	printf("%s to move: ", turn ? "Black" : "White");
+	scanf("%s", reply);
+	printf("\n");
 }
