@@ -16,7 +16,13 @@ int validateCastling(char *, int);
 int validatePawnMove(char *, int);
 int validatePieceMove(char *, int);
 int isSquare(char *);
-
+int canMove(char[][FILES], int, char *, int);
+int canPawnMove(char[][FILES], int, char *);
+int canPawnCapture(char[][FILES], int, char *);
+int canPieceMove(char[][FILES], int, char *);
+int canPieceCapture(char[][FILES], int, char *);
+int canKingsideCastle(char[][FILES], int, char *);
+int canQueensideCastle(char[][FILES], int, char *);
 
 int main() {
 	char board[RANKS][FILES] = {
@@ -42,13 +48,19 @@ int main() {
 
 		if (!strcmp(input, "quit")) {
 			isPlaying = 0;
-		} else {
-			if((command = validateInput(input))) {
+		} else if((command = validateInput(input))) {
+			if (command == 3 || command == 4) {
+				input[0] = toupper(input[0]);
+			}
+			if (canMove(board, turn, input, command)) {
 				printf("%d.%s%s\n", moves, turn ? ".." : "", input);
 			} else {
-				printf("Invalid input.\n");
+				printf("Illegal move.\n");
 				continue;
 			}
+		} else {
+			printf("Invalid input.\n");
+			continue;
 		}
 
 		if (turn) {
@@ -142,4 +154,68 @@ int validateCastling(char *str, int len) {
 
 int isSquare(char *str) {
 	return str[0] >= 'a' && str[0] <= 'h' && str[1] >= '1' && str[1] <= '8';
+}
+
+int canMove(char board[][FILES], int side, char *input, int command) {
+	switch(command){
+		case 1:	return canPawnMove(board, side, input);
+		case 2:	return canPawnCapture(board, side, input);
+		case 3:	return canPieceMove(board, side, input);
+		case 4:	return canPieceCapture(board, side, input);
+		case 5:	return canKingsideCastle(board, side, input);
+		case 6:	return canQueensideCastle(board, side, input);
+		default:
+				return 0;
+	}
+}
+
+int getRow(char c) {
+	return 8 - (c - '0');
+}
+
+int getCol(char c) {
+	return c - 'a';
+}
+
+int canPawnMove(char board[][FILES], int side, char *input) {
+	int row = getRow(input[1]);
+	int col = getCol(input[0]);
+
+	if (board[row][col] == '.') {
+		if (side == white) { 
+			if (board[row+1][col] == 'p' || 
+					(row == 4 && board[row+1][col] == '.' && 
+					board[6][col] == 'p')) {
+				return 1;
+			}
+		} else {
+			if (board[row-1][col] == 'P' || 
+					(row == 3 && board[row-1][col] == '.' && 
+					board[1][col] == 'P')) {
+				return 1;
+			}
+		}
+	}
+
+	return 0;
+}
+
+int canPawnCapture(char board[][FILES], int side, char *input) {
+	return 0;
+}
+
+int canPieceMove(char board[][FILES], int side, char *input) {
+	return 0;
+}
+
+int canPieceCapture(char board[][FILES], int side, char *input) {
+	return 0;
+}
+
+int canKingsideCastle(char board[][FILES], int side, char *input) {
+	return 0;
+}
+
+int canQueensideCastle(char board[][FILES], int side, char *input) {
+	return 0;
 }
