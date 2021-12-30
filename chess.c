@@ -17,13 +17,14 @@ int validatePawnMove(char *, int);
 int validatePieceMove(char *, int);
 int isSquare(char *);
 int isAlgebraic(char);
-int canMove(char[][FILES], int, char *, int);
+char isPawnMovingTwo(char [][FILES], int, char *, int);
+int canMove(char[][FILES], int, char *, int, char *);
 int getRow(char);
 int getColumn(char);
 char *getTargetSquare(char[][FILES], char *);
 void makeMove(char[][MAX_CHAR], char *, char *);
 char *getPawnMoveStart(char[][FILES], int, char *);
-char *getPawnCaptureStart(char[][FILES], int, char *);
+char *getPawnCaptureStart(char[][FILES], int, char *, char *);
 
 
 int main() {
@@ -43,6 +44,7 @@ int main() {
 	int isPlaying = 1;
 	int command;
 	int moves = 1;
+	char enPassant[] = {0, 0};
 
 	while (isPlaying) {
 		display(board);
@@ -54,8 +56,9 @@ int main() {
 			if (command == 3 || command == 4) {
 				input[0] = toupper(input[0]);
 			}
-			if (canMove(board, turn, input, command)) {
+			if (canMove(board, turn, input, command, enPassant)) {
 				printf("%d.%s%s\n", moves, turn ? ".." : "", input);
+				enPassant[(turn+1)%2] = 0;
 			} else {
 				printf("Illegal move.\n");
 				continue;
@@ -159,14 +162,30 @@ int isAlgebraic(char c) {
 	return (c >='a' && c <= 'h') || (c >= '1' && c<= '8');
 }
 
-int canMove(char board[][FILES], int side, char *input, int command) {
+// returns rank of pawn if it moves two squares
+char isPawnMovingTwo(char board[][FILES], int side, char *input, int len) {
+	int file = getColumn(input[len-2]);
+
+	if ((side == white && input[len-1] == '4' && 
+			board[5][file] == '.' && board[6][file] == 'p') ||
+			(side == black && input[len-1] == '5' && 
+			board[2][file] == '.' && board[1][file] == 'P')) {
+		return file + 'a';
+	}
+	return 0;
+}
+
+int canMove(char board[][FILES], int side, char *input, int command, 
+		char *enPassant) {
 	char *to, *from;
 	int len = strlen(input);
 
 	switch(command) {
 		case 1:	from = getPawnMoveStart(board, side, input);
+				// if pawn moves 2 spaces, enPassant is true for this side
+				enPassant[side] = isPawnMovingTwo(board, side, input, len);
 				break;
-		case 2:	from = getPawnCaptureStart(board, side, input);
+		case 2:	from = getPawnCaptureStart(board, side, input, enPassant);
 				break;
 		case 3:	return 1;
 		case 4:	return 1;
@@ -237,22 +256,31 @@ char *getPawnMoveStart(char board[][FILES], int side, char *input) {
 	return 0;
 }
 
-char *getPawnCaptureStart(char board[][FILES], int side, char *input) {
+char *getPawnCaptureStart(char board[][FILES], int side, char *input, 
+		char *enPassant) {
 	int len = strlen(input);
 	int row = getRow(input[len-1]);
 	int col = getColumn(input[len-2]);
 	char target = board[row][col];
 	int file = getColumn(input[0]);
 
-	if (target != '.') {
-		if (side == white && isEnemy(target, white) && 
-				((file == col - 1 && board[row+1][file] == 'p') ||
-				(file == col + 1 && board[row+1][file] == 'p'))) {
-			return &board[row+1][file];
-		} else if (side == black && isEnemy(target, black) &&
-				((file == col - 1 && board[row-1][file] == 'P') ||
-				(file == col + 1 && board[row-1][file] == 'P'))) {
-			return &board[row-1][file];
+	if (file == col - 1 || file == col + 1) {
+		if (target != '.' && isEnemy(target, side)) {	// normal capture
+			if (side == white && board[row+1][file] == 'p') {
+				return &board[row+1][file];
+			} else if (side == black && board[row-1][file] == 'P') {
+				return &board[row-1][file];
+			}
+		} else if (enPassant[(side+1)%2] == input[len-2]) {	// en passant
+			if (side == white && isEnemy(board[row+1][col], white) &&
+					board[row+1][file] == 'p') {
+				board[row+1][col] = '.';
+				return &board[row+1][file];
+			} else if (side == black && isEnemy(board[row-1][col], black) &&
+					board[row-1][file] == 'P') {
+				board[row-1][col] = '.';
+				return &board[row-1][file];
+			}
 		}
 	}
 
