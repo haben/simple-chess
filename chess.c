@@ -1,15 +1,14 @@
 #include <stdio.h>
 #include <string.h>	// strlen, strcmp
-#include <ctype.h>	// tolower
 
 #define RANKS 8
 #define FILES 8
 #define MAX_CHAR 8
 
-const char *pieces = "kqrbn";
+const char *pieces = "KQRBN";
 enum player{white, black};
 
-void display(char[][FILES]);
+void display(char [][FILES]);
 void askMove(int, char *);
 int validateInput(char *);
 int validateCastling(char *, int);
@@ -17,14 +16,19 @@ int validatePawnMove(char *, int);
 int validatePieceMove(char *, int);
 int isSquare(char *);
 int isAlgebraic(char);
+int isFile(char);
+int isRank(char);
 char isPawnMovingTwo(char [][FILES], int, char *, int);
 int canMove(char[][FILES], int, char *, int, char *);
 int getRow(char);
 int getColumn(char);
 char *getTargetSquare(char[][FILES], char *);
 void makeMove(char[][MAX_CHAR], char *, char *);
-char *getPawnMoveStart(char[][FILES], int, char *);
-char *getPawnCaptureStart(char[][FILES], int, char *, char *);
+char *getMovingPawn(char[][FILES], int, char *);
+char *getCapturingPawn(char[][FILES], int, char *, char *);
+char *getMovingPiece(char[][FILES], int, char *);
+char *canPieceMove(char[][FILES], char, int, int, int, int);
+char *findPiece(char[][FILES], char, int, int);
 
 
 int main() {
@@ -53,9 +57,6 @@ int main() {
 		if (!strcmp(input, "quit")) {
 			isPlaying = 0;
 		} else if((command = validateInput(input))) {
-			if (command == 3 || command == 4) {
-				input[0] = toupper(input[0]);
-			}
 			if (canMove(board, turn, input, command, enPassant)) {
 				printf("%d.%s%s\n", moves, turn ? ".." : "", input);
 				enPassant[(turn+1)%2] = 0;
@@ -104,15 +105,11 @@ int validateInput(char *str) {
 		return 0;
 	} 
 
-	for (int i = 0; str[i]; i++) {
-		str[i] = tolower(str[i]);
-	}
-
-	if ((c = str[0]) == '0' || c == 'o') {	// "o0" - castling
+	if ((c = str[0]) == '0' || c == 'o' || c == 'O') {	// "oO0" - castling
 		return validateCastling(str, len);
-	} else if (c >= 'a' && c <= 'h') {	// "abcdefgh" - pawn move
+	} else if (isFile(c)) {	// "abcdefgh" - pawn move
 		return validatePawnMove(str, len);
-	} else {	// " "pnbrqk" - piece move
+	} else {	// "NBRQK" - piece move
 		i = 0;
 		while (pieces[i]) {
 			if (c == pieces[i++]) {
@@ -134,21 +131,25 @@ int validatePawnMove(char *str, int len) {
 }
 
 int validatePieceMove(char *str, int len) {
-	if ((len == 3 && isSquare(&str[1])) || 
-			(len == 4 && isSquare(&str[2]) && isAlgebraic(str[1]))) {
-		return 3;	// piece move
-	} else if ((str[1] == 'x' && len == 4 && isSquare(&str[2])) ||
-			(str[2] == 'x' && len == 5 && isSquare(&str[3]) &&
-			isAlgebraic(str[1]))) {
-		return 4;	// piece capture
+	if (isSquare(&str[len-2])) {
+		if (len == 3 || (len == 4 && isAlgebraic(str[1])) ||
+				(len == 5 && isRank(str[1]) && isFile(str[2]))) {
+			return 3;	// piece move
+		} else if ((str[1] == 'x' && len == 4) ||
+				(str[2] == 'x' && len == 5 && isAlgebraic(str[1])) ||
+				(str[3] == 'x' && len == 6 && isRank(str[1]) && 
+				isFile(str[2]))) {
+			return 4;	// piece capture
+		}
 	}
 	return 0;
 }
 
 int validateCastling(char *str, int len) {
-	if (!strcmp("o-o", str) || !strcmp("0-0", str)) {
+	if (!strcmp("o-o", str) || !strcmp("0-0", str) || !strcmp("O-O", str)) {
 		return 5;	// kingside castle
-	} else if (!strcmp("o-o-o", str) || !strcmp("0-0-0", str)) {
+	} else if (!strcmp("o-o-o", str) || !strcmp("0-0-0", str) || 
+			!strcmp("O-O-O", str)) {
 		return 6;	// queenside castle
 	}
 	return 0;
@@ -159,7 +160,15 @@ int isSquare(char *str) {
 }
 
 int isAlgebraic(char c) {
-	return (c >='a' && c <= 'h') || (c >= '1' && c<= '8');
+	return (c >= 'a' && c <= 'h') || (c >= '1' && c<= '8');
+}
+
+int isFile(char c) {
+	return c >= 'a' && c <= 'h';
+}
+
+int isRank(char c) {
+	return c >= '1' && c <= '8';
 }
 
 // returns rank of pawn if it moves two squares
@@ -181,13 +190,14 @@ int canMove(char board[][FILES], int side, char *input, int command,
 	int len = strlen(input);
 
 	switch(command) {
-		case 1:	from = getPawnMoveStart(board, side, input);
+		case 1:	from = getMovingPawn(board, side, input);
 				// if pawn moves 2 spaces, enPassant is true for this side
 				enPassant[side] = isPawnMovingTwo(board, side, input, len);
 				break;
-		case 2:	from = getPawnCaptureStart(board, side, input, enPassant);
+		case 2:	from = getCapturingPawn(board, side, input, enPassant);
 				break;
-		case 3:	return 1;
+		case 3:	from = getMovingPiece(board, side, input);
+				break;
 		case 4:	return 1;
 		case 5:	return 1;
 		case 6:	return 1;
@@ -195,7 +205,7 @@ int canMove(char board[][FILES], int side, char *input, int command,
 				return 0;
 	}
 
-	if (command >= 1 && command <= 2) {
+	if (command >= 1 && command <= 3) {
 		if (!from) {
 			return 0;
 		} else {
@@ -231,7 +241,7 @@ int isEnemy(char c, int side) {
 		(side == black && c >= 'a' && c < 'z');
 }
 
-char *getPawnMoveStart(char board[][FILES], int side, char *input) {
+char *getMovingPawn(char board[][FILES], int side, char *input) {
 	int row = getRow(input[1]);
 	int col = getColumn(input[0]);
 
@@ -256,7 +266,7 @@ char *getPawnMoveStart(char board[][FILES], int side, char *input) {
 	return 0;
 }
 
-char *getPawnCaptureStart(char board[][FILES], int side, char *input, 
+char *getCapturingPawn(char board[][FILES], int side, char *input, 
 		char *enPassant) {
 	int len = strlen(input);
 	int row = getRow(input[len-1]);
@@ -284,5 +294,85 @@ char *getPawnCaptureStart(char board[][FILES], int side, char *input,
 		}
 	}
 
+	return 0;
+}
+
+int matchPieceRow(char board[][FILES], char piece, int col) {
+	int count = 0;
+	int row = -1;
+
+	for (int i = 0; i < RANKS; i++) {
+		if (board[i][col] == piece) {
+			if (!count) {
+				row = i;
+				count++;
+			} else {
+				return -1;
+			}
+		}
+	}
+	return row >= 0 && row <= 7;
+}
+
+int matchPieceColumn(char board[][FILES], char piece, int row) {
+	int count = 0;
+	int col = -1;
+
+	for (int i = 0; i < FILES; i++) {
+		if (board[row][i] == piece) {
+			if (!count) {
+				col = i;
+				count++;
+			} else {
+				return -1;
+			}
+		}
+	}
+	return col >= 0 && col <= 7;
+}
+
+char *getMovingPiece(char board[][FILES], int side, char *input) {
+	int len = strlen(input);
+	int row = getRow(input[len-1]);
+	int col = getColumn(input[len-2]);
+	char piece = input[0];
+	int pRow = -1;
+	int pCol = -1;
+	int extraChar = 0;
+
+	if (board[row][col] == '.') {
+		if (len == 5) {
+			pRow = getRow(input[1]);
+			pCol = getColumn(input[2]);
+			if (board[pRow][pCol] != piece) {
+				return 0;
+			}
+			return canPieceMove(board, piece, pRow, pCol, row, col);
+		} else if (len == 4) {
+			if	(input[1] >= 'a' && input[1] <= 'h') {
+				pCol = getColumn(input[1]);
+				pRow = matchPieceRow(board, piece, pCol);
+			} else {
+				pRow = getRow(input[1]);
+				pCol = matchPieceColumn(board, piece, pRow);
+			}
+			if (pRow == -1 || pCol == -1) {
+				return 0;
+			}
+			return canPieceMove(board, piece, pRow, pCol, row, col);
+		} else {
+			return findPiece(board, piece, row, col);
+		}
+	}
+
+	return 0;
+}
+
+char *canPieceMove(char board[][FILES], char piece, int row0, int col0, 
+		int row1, int col1) {
+	return 0;
+}
+
+char *findPiece(char board[][FILES], char piece, int row, int col) {
 	return 0;
 }
