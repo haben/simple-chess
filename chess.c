@@ -22,7 +22,8 @@ int getRow(char);
 int getColumn(char);
 char *getTargetSquare(char[][FILES], char *);
 void makeMove(char[][MAX_CHAR], char *, char *);
-char *getPawnStart(char[][FILES], int, char *);
+char *getPawnMoveStart(char[][FILES], int, char *);
+char *getPawnCaptureStart(char[][FILES], int, char *);
 
 
 int main() {
@@ -162,22 +163,27 @@ int canMove(char board[][FILES], int side, char *input, int command) {
 	char *to, *from;
 	int len = strlen(input);
 
-	switch(command){
-		case 1:	from = getPawnStart(board, side, input);
-				if (!from) {
-					return 0;
-				} else {
-					to = getTargetSquare(board, input);
-					makeMove(board, to, from);
-					return 1;
-				}
-		case 2:	return 1;
+	switch(command) {
+		case 1:	from = getPawnMoveStart(board, side, input);
+				break;
+		case 2:	from = getPawnCaptureStart(board, side, input);
+				break;
 		case 3:	return 1;
 		case 4:	return 1;
 		case 5:	return 1;
 		case 6:	return 1;
 		default:
 				return 0;
+	}
+
+	if (command >= 1 && command <= 2) {
+		if (!from) {
+			return 0;
+		} else {
+			to = getTargetSquare(board, &input[len-2]);
+			makeMove(board, to, from);
+			return 1;
+		}
 	}
 }
 
@@ -201,7 +207,12 @@ void makeMove(char board[][MAX_CHAR], char *to, char *from) {
 	*to = ch;
 }
 
-char *getPawnStart(char board[][FILES], int side, char *input) {
+int isEnemy(char c, int side) {
+	return (side == white && c >= 'A' && c < 'Z') ||
+		(side == black && c >= 'a' && c < 'z');
+}
+
+char *getPawnMoveStart(char board[][FILES], int side, char *input) {
 	int row = getRow(input[1]);
 	int col = getColumn(input[0]);
 
@@ -220,6 +231,28 @@ char *getPawnStart(char board[][FILES], int side, char *input) {
 					board[1][col] == 'P') {
 				return &board[1][col];
 			}
+		}
+	}
+
+	return 0;
+}
+
+char *getPawnCaptureStart(char board[][FILES], int side, char *input) {
+	int len = strlen(input);
+	int row = getRow(input[len-1]);
+	int col = getColumn(input[len-2]);
+	char target = board[row][col];
+	int file = getColumn(input[0]);
+
+	if (target != '.') {
+		if (side == white && isEnemy(target, white) && 
+				((file == col - 1 && board[row+1][file] == 'p') ||
+				(file == col + 1 && board[row+1][file] == 'p'))) {
+			return &board[row+1][file];
+		} else if (side == black && isEnemy(target, black) &&
+				((file == col - 1 && board[row-1][file] == 'P') ||
+				(file == col + 1 && board[row-1][file] == 'P'))) {
+			return &board[row-1][file];
 		}
 	}
 
