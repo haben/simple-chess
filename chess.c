@@ -6,8 +6,8 @@
 #define FILES 8
 #define MAX_CHAR 8
 
-enum player{white, black};
 const char *pieces = "kqrbn";
+enum player{white, black};
 
 void display(char[][FILES]);
 void askMove(int, char *);
@@ -16,12 +16,13 @@ int validateCastling(char *, int);
 int validatePawnMove(char *, int);
 int validatePieceMove(char *, int);
 int isSquare(char *);
+int isAlgebraic(char);
 int canMove(char[][FILES], int, char *, int);
 int getRow(char);
-int getCol(char);
-char *parseTarget(char[][FILES], char *);
+int getColumn(char);
+char *getTargetSquare(char[][FILES], char *);
 void makeMove(char[][MAX_CHAR], char *, char *);
-char *getPawnMover(char[][FILES], int, char *);
+char *getPawnStart(char[][FILES], int, char *);
 
 
 int main() {
@@ -107,7 +108,7 @@ int validateInput(char *str) {
 		return validateCastling(str, len);
 	} else if (c >= 'a' && c <= 'h') {	// "abcdefgh" - pawn move
 		return validatePawnMove(str, len);
-	} else {
+	} else {	// " "pnbrqk" - piece move
 		i = 0;
 		while (pieces[i]) {
 			if (c == pieces[i++]) {
@@ -130,14 +131,11 @@ int validatePawnMove(char *str, int len) {
 
 int validatePieceMove(char *str, int len) {
 	if ((len == 3 && isSquare(&str[1])) || 
-			(len == 4 && isSquare(&str[2]) &&
-			((str[1] >= 'a' && str[1] <= 'h') ||
-			(str[1] >= '1' && str[1] <= '8')))) {
+			(len == 4 && isSquare(&str[2]) && isAlgebraic(str[1]))) {
 		return 3;	// piece move
 	} else if ((str[1] == 'x' && len == 4 && isSquare(&str[2])) ||
 			(str[2] == 'x' && len == 5 && isSquare(&str[3]) &&
-			((str[1] >= 'a' && str[1] <= 'h') ||
-			(str[1] >= '1' && str[1] <= '8')))) {
+			isAlgebraic(str[1]))) {
 		return 4;	// piece capture
 	}
 	return 0;
@@ -156,20 +154,28 @@ int isSquare(char *str) {
 	return str[0] >= 'a' && str[0] <= 'h' && str[1] >= '1' && str[1] <= '8';
 }
 
+int isAlgebraic(char c) {
+	return (c >='a' && c <= 'h') || (c >= '1' && c<= '8');
+}
+
 int canMove(char board[][FILES], int side, char *input, int command) {
 	char *to, *from;
 	int len = strlen(input);
 
 	switch(command){
-		case 1:	from = getPawnMover(board, side, input);
+		case 1:	from = getPawnStart(board, side, input);
 				if (!from) {
 					return 0;
 				} else {
-					to = parseTarget(board, input);
+					to = getTargetSquare(board, input);
 					makeMove(board, to, from);
 					return 1;
 				}
-				break;
+		case 2:	return 1;
+		case 3:	return 1;
+		case 4:	return 1;
+		case 5:	return 1;
+		case 6:	return 1;
 		default:
 				return 0;
 	}
@@ -179,16 +185,13 @@ int getRow(char c) {
 	return 8 - (c - '0');
 }
 
-int getCol(char c) {
+int getColumn(char c) {
 	return c - 'a';
 }
 
-char *parseTarget(char board[][MAX_CHAR], char *input) {
+char *getTargetSquare(char board[][MAX_CHAR], char *input) {
 	int len = strlen(input);
-	int row = getRow(input[len-1]);
-	int col = getCol(input[len-2]);
-
-	return &board[row][col];;
+	return &board[getRow(input[len-1])][getColumn(input[len-2])];
 }
 
 void makeMove(char board[][MAX_CHAR], char *to, char *from) {
@@ -198,9 +201,9 @@ void makeMove(char board[][MAX_CHAR], char *to, char *from) {
 	*to = ch;
 }
 
-char *getPawnMover(char board[][FILES], int side, char *input) {
+char *getPawnStart(char board[][FILES], int side, char *input) {
 	int row = getRow(input[1]);
-	int col = getCol(input[0]);
+	int col = getColumn(input[0]);
 
 	if (board[row][col] == '.') {
 		if (side == white) { 
