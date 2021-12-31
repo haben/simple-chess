@@ -8,15 +8,16 @@
 const char *pieces = "KQRBN";
 const int diagonalMoves[4][2] = {{-1, -1}, {-1, 1}, {1, -1}, {1, 1}};
 const int orthogonalMoves[4][2] = {{-1, 0}, {0, -1}, {0, 1}, {1, 0}};
-const int knightMoves[8][2] = {{-2, -1}, {-2, 1}, {-1, -2}, {-1, 2}, {1, -2},
-	{1, 2}, {2, -1}, {2, 1}};
 const int kingMoves[8][2] = {{-1, -1}, {-1, 0}, {-1, 1}, {0, -1}, {0, 1},
 	{1, -1}, {1, 0}, {1, 1}};
+const int knightMoves[8][2] = {{-2, -1}, {-2, 1}, {-1, -2}, {-1, 2}, {1, -2},
+	{1, 2}, {2, -1}, {2, 1}};
 
 enum player{ WHITE, BLACK };
 
 void display(char [][FILES]);
 void askMove(int, char *);
+void help();
 int validateInput(char *);
 int validateCastling(char *, int);
 int validatePawnMove(char *, int);
@@ -63,6 +64,7 @@ int main() {
 	int command;
 	int moves = 1;
 	char enPassant[] = {0, 0};
+	int canCastle[] = {1, 1};
 
 	while (isPlaying) {
 		display(board);
@@ -70,6 +72,9 @@ int main() {
 
 		if (!strcmp(input, "quit")) {
 			isPlaying = 0;
+		} else if (!strcmp(input, "?")) {
+			help();
+			continue;
 		} else if((command = validateInput(input))) {
 			if (canMove(board, turn, input, command, enPassant)) {
 				printf("%d.%s%s\n", moves, turn ? ".." : "", input);
@@ -93,15 +98,19 @@ int main() {
 }
 
 void display(char board[][FILES]) {
-	printf("+-----------------+\n");
+	printf("\n   ");
+	for (int i = 0; i < FILES; i++) {
+		printf(" %c", i + 'a');
+	}
+	printf("\n  +-----------------+\n");
 	for (int i = 0; i < RANKS; i++) {
-		printf("|");
+		printf("%d |", 8 - i);
 		for (int j = 0; j < FILES; j++) {
 			printf(" %c", board[i][j]);
 		}
 		printf(" | %d\n", 8 - i);
 	}
-	printf("+-----------------+\n ");
+	printf("  +-----------------+\n   ");
 	for (int i = 0; i < FILES; i++) {
 		printf(" %c", i + 'a');
 	}
@@ -109,9 +118,30 @@ void display(char board[][FILES]) {
 }
 
 void askMove(int turn, char *reply) {
-	printf("\n%s to move: ", turn ? "Black" : "White");
+	printf("\n%s to move('?' for help): ", turn ? "Black" : "White");
 	scanf("%s", reply);
 	printf("\n");
+}
+
+void help() {
+	printf("White pieces are lowercase letters and the black pieces are\n");
+	printf("uppercase.\n");
+	printf("As for which letters represent the pieces:\n");
+	printf("'p', 'P' - white/black pawn\n");
+	printf("'n', 'N' - white/black Knight\n");
+	printf("'b', 'B' - white/black Bishop\n");
+	printf("'r', 'R' - white/black Rook\n");
+	printf("'q', 'Q' - white/black Queen\n");
+	printf("'k', 'K' - white/black King\n\n");
+	printf("This program takes algebraic notation for input.\n\n");
+	printf("For example, 'Nf3' moves the knight in g1 to f3.\n");
+	printf("'e5' would move the pawn in e7 to e5.\n");
+	printf("'Nxe5' would then have the knight capture the pawn in e5.\n");
+	/*
+	printf("'O-O', '0-0-0', 'o-o-o', or any variation can be typed for\n");
+	printf("castling when it's legal.\n\n");
+	*/
+	printf("\nTo exit the game, type 'quit'.\n\n");
 }
 
 int validateInput(char *str) {
@@ -550,7 +580,6 @@ char *findKingOrKnight(char board[][FILES], char piece, int row1, int col1) {
 
 	return square;
 }
-
 
 char *getCapturingPiece(char board[][FILES], int side, char *input) {
 	int len = strlen(input);
