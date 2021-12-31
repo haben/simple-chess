@@ -6,6 +6,13 @@
 #define MAX_CHAR 8
 
 const char *pieces = "KQRBN";
+const int knightMoves[8][2] = {{-2, -1}, {-2, 1}, {-1, -2}, {-1, 2}, {1, -2},
+	{1, 2}, {2, -1}, {2, 1}};
+const int diagonalMoves[4][2] = {{-1, -1}, {-1, 1}, {1, -1}, {1, 1}};
+const int orthogonalMoves[4][2] = {{-1, 0}, {0, -1}, {0, 1}, {1, 0}};
+const int kingMoves[8][2] = {{-1, -1}, {-1, 0}, {-1, 1}, {0, -1}, {0, 1},
+	{1, -1}, {1, 0}, {1, 1}};
+
 enum player{white, black};
 
 void display(char [][FILES]);
@@ -29,6 +36,9 @@ char *getCapturingPawn(char[][FILES], int, char *, char *);
 char *getMovingPiece(char[][FILES], int, char *);
 char *canPieceMove(char[][FILES], char, int, int, int, int);
 char *findPiece(char[][FILES], char, int, int);
+int isInBounds(int, int);
+char *searchFourWays(char[][FILES], char, int, int, char);
+char *searchEightWays(char[][FILES], char, int, int, char);
 
 
 int main() {
@@ -79,18 +89,23 @@ int main() {
 }
 
 void display(char board[][FILES]) {
-	printf("---------------\n");
+	printf("+-----------------+\n");
 	for (int i = 0; i < RANKS; i++) {
+		printf("|");
 		for (int j = 0; j < FILES; j++) {
-			printf("%c ", board[i][j]);
+			printf(" %c", board[i][j]);
 		}
-		printf("\n");
+		printf(" | %d\n", 8 - i);
+	}
+	printf("+-----------------+\n ");
+	for (int i = 0; i < FILES; i++) {
+		printf(" %c", i + 'a');
 	}
 	printf("\n");
 }
 
 void askMove(int turn, char *reply) {
-	printf("%s to move: ", turn ? "Black" : "White");
+	printf("\n%s to move: ", turn ? "Black" : "White");
 	scanf("%s", reply);
 	printf("\n");
 }
@@ -315,14 +330,14 @@ int matchPieceRow(char board[][FILES], char piece, int col) {
 }
 
 int matchPieceColumn(char board[][FILES], char piece, int row) {
-	int count = 0;
+	int found = 0;
 	int col = -1;
 
 	for (int i = 0; i < FILES; i++) {
 		if (board[row][i] == piece) {
-			if (!count) {
+			if (!found) {
 				col = i;
-				count++;
+				found++;
 			} else {
 				return -1;
 			}
@@ -341,6 +356,10 @@ char *getMovingPiece(char board[][FILES], int side, char *input) {
 	int extraChar = 0;
 
 	if (board[row][col] == '.') {
+		if (side == white) {
+			piece += 32;
+		}
+
 		if (len == 5) {
 			pRow = getRow(input[1]);
 			pCol = getColumn(input[2]);
@@ -374,5 +393,88 @@ char *canPieceMove(char board[][FILES], char piece, int row0, int col0,
 }
 
 char *findPiece(char board[][FILES], char piece, int row, int col) {
+	char *square = 0;
+
+	switch (piece) {
+		case 'n':
+		case 'N':	return searchEightWays(board, piece, row, col, 'n');
+		case 'b':
+		case 'B':	return searchFourWays(board, piece, row, col, 'd');
+		case 'r':
+		case 'R':	return searchFourWays(board, piece, row, col, 'o');
+		case 'q':
+		case 'Q':	square = searchFourWays(board, piece, row, col, 'd');
+					if (!square) {
+						square = searchFourWays(board, piece, row, col, 'o');
+					}
+		case 'k':
+		case 'K':	return searchEightWays(board, piece, row, col, 'k');
+	}
+
 	return 0;
+}
+
+int isInBounds(int m, int n) {
+	return m >= 0 && m <= 7 && n >= 0 && n <= 7;
+}
+
+char *searchEightWays(char board[][FILES], char piece, int row1, int col1,
+		char moves) {
+	int row0, col0, r, c;
+	int found = 0;
+	char *square = 0;
+
+	for (int i = 0; i < 8; i++) {
+		r = (moves == 'n') ? knightMoves[i][0] : kingMoves[i][0];
+		c = (moves == 'n') ? knightMoves[i][1] : kingMoves[i][1];
+		
+		row0 = row1 + r;
+		col0 = col1 + c;
+
+		if (!isInBounds(row0, col0)) {
+			continue;
+		}
+		if (board[row0][col0] == piece) {
+			if (!found) {
+				found++;
+				square = &board[row0][col0];
+			} else {
+				return 0;
+			}
+		}
+
+	}
+
+	return square;
+}
+
+char *searchFourWays(char board[][FILES], char piece, int row1, int col1, 
+		char moves) {
+	int row0, col0, r, c;
+	int found = 0;
+	char *square = 0;
+
+	for (int i = 0; i < 4; i++) {
+		r = (moves == 'd') ? diagonalMoves[i][0] : orthogonalMoves[i][0];
+		c = (moves == 'd') ? diagonalMoves[i][1] : orthogonalMoves[i][1];
+
+		row0 = row1 + r;
+		col0 = col1 + c;
+
+		while (isInBounds(row0, col0) &&
+				(board[row0][col0] == piece || board[row0][col0] == '.')) {
+			if (board[row0][col0] == piece) {
+				if (!found) {
+					found++;
+					square = &board[row0][col0];
+				} else {
+					return 0;
+				}
+			}
+			row0 += r;
+			col0 += c;
+		}
+	}
+
+	return square;
 }
