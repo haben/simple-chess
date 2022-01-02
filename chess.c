@@ -6,10 +6,10 @@
 #define MAX_CHAR 8
 
 const char *pieces = "KQRBN";
-const int direction[8][2] = {{0, 1}, {1, 1}, {1, 0}, {1, -1}, {0, -1},
-	{-1, -1}, {-1, 0}, {-1, 1}};
-const int knightMoves[8][2] = {{-2, -1}, {-2, 1}, {-1, -2}, {-1, 2}, {1, -2},
-	{1, 2}, {2, -1}, {2, 1}};
+const int direction[][8][2] = {
+	{{0, 1}, {1, 1}, {1, 0}, {1, -1}, {0, -1}, {-1, -1}, {-1, 0}, {-1, 1}},
+	{{-2, -1}, {-2, 1}, {-1, -2}, {-1, 2}, {1, -2}, {1, 2}, {2, -1}, {2, 1}}
+};
 
 enum player{ WHITE, BLACK };
 
@@ -18,13 +18,12 @@ void askMove(int, char *);
 int validateInput(char *);
 int validatePawnMove(char *, int);
 int validatePieceMove(char *, int);
-int validateCastling(char *, int);
+int validateCastling(char *);
 int isFile(char);
 int isRank(char);
 int isAlgebraic(char);
 int isSquare(char *);
 int isInBounds(int, int);
-char findPawnMovingTwo(char [][FILES], int, char *);
 int canMove(char[][FILES], int, char *, int, char *, int[][2]);
 int canCastle(char[][FILES], int, int, int[][2]);
 void trackCastle(char, int, int, int[][2]);
@@ -36,13 +35,12 @@ int isEnemy(char, int);
 char *canPieceMove(char[][MAX_CHAR], char, int, int, int, int);
 int canMoveShortRanged(char, int, int);
 int canMoveLongRanged(char[][MAX_CHAR], int, int, int, int);
-char *getMovingPawn(char[][FILES], int, char *);
+char *getMovingPawn(char[][FILES], int, char *, char *);
 char *getCapturingPawn(char[][FILES], int, char *, char *);
 int matchPiece(char[][FILES], char, int, int);
 char *getPiece(char[][FILES], int, char *, int[][2], int);
 char *findPiece(char[][FILES], char, int, int, int[][2]);
-char *findShortRangedPiece(char[][FILES], char, int, int, int[][2]);
-char *findLongRangedPiece(char[][FILES], char, int, int, int[][2]);
+int isSafe(char[][FILES], int, int, int);
 
 
 int main() {
@@ -130,25 +128,27 @@ int validateInput(char *str) {
 	} 
 
 	if ((c = str[0]) == '0' || c == 'o' || c == 'O') {	// "oO0" - castling
-		return validateCastling(str, len);
-	} else if (isFile(c)) {	// "abcdefgh" - pawn move
-		return validatePawnMove(str, len);
-	} else {	// "NBRQK" - piece move
-		i = 0;
-		while (pieces[i]) {
-			if (c == pieces[i++]) {
-				return validatePieceMove(str, len);
+		return validateCastling(str);
+	} else if (isSquare(&str[len-2])) {
+		if (isFile(c)) {	// "abcdefgh" - pawn move
+			return validatePawnMove(str, len);
+		} else {	// "NBRQK" - piece move
+			i = 0;
+			while (pieces[i]) {
+				if (c == pieces[i++]) {
+					return validatePieceMove(str, len);
+				}
 			}
 		}
-	}	
+	}
 
 	return 0;
 }
 
 int validatePawnMove(char *str, int len) {
-	if (len == 2 && isSquare(str)) {
+	if (len == 2) {
 		return 1;	// pawn move
-	} else if (len == 4 && str[1] == 'x' && isSquare(&str[2])) {
+	} else if (len == 4 && str[1] == 'x') {
 		return 2;	// pawn capture
 	}
 
@@ -156,22 +156,19 @@ int validatePawnMove(char *str, int len) {
 }
 
 int validatePieceMove(char *str, int len) {
-	if (isSquare(&str[len-2])) {
-		if (len == 3 || (len == 4 && isAlgebraic(str[1])) ||
-				(len == 5 && isRank(str[1]) && isFile(str[2]))) {
-			return 3;	// piece move
-		} else if ((str[1] == 'x' && len == 4) ||
-				(str[2] == 'x' && len == 5 && isAlgebraic(str[1])) ||
-				(str[3] == 'x' && len == 6 && isRank(str[1]) && 
-				isFile(str[2]))) {
-			return 4;	// piece capture
-		}
+	if (len == 3 || (len == 4 && isAlgebraic(str[1])) ||
+			(len == 5 && isRank(str[1]) && isFile(str[2]))) {
+		return 3;	// piece move
+	} else if ((str[1] == 'x' && len == 4) ||
+			(str[2] == 'x' && len == 5 && isAlgebraic(str[1])) ||
+			(str[3] == 'x' && len == 6 && isRank(str[1]) && isFile(str[2]))) {
+		return 4;	// piece capture
 	}
 
 	return 0;
 }
 
-int validateCastling(char *str, int len) {
+int validateCastling(char *str) {
 	if (!strcmp("o-o", str) || !strcmp("0-0", str) || !strcmp("O-O", str)) {
 		return 5;	// kingside castle
 	} else if (!strcmp("o-o-o", str) || !strcmp("0-0-0", str) || 
@@ -201,28 +198,13 @@ int isInBounds(int m, int n) {
 	return m >= 0 && m <= 7 && n >= 0 && n <= 7;
 }
 
-// returns rank of pawn if it moves two squares
-char findPawnMovingTwo(char board[][FILES], int side, char *input) {
-	int len = strlen(input);
-	int file = getColumn(input[len-2]);
-
-	if ((side == WHITE && input[len-1] == '4' && 
-			board[5][file] == '.' && board[6][file] == 'p') ||
-			(side == BLACK && input[len-1] == '5' && 
-			board[2][file] == '.' && board[1][file] == 'P')) {
-		return file + 'a';
-	}
-	return 0;
-}
-
 int canMove(char board[][FILES], int turn, char *input, int command, 
 		char *enPassant, int hasCastled[][2]) {
 	char *to, *from;
 	int len = strlen(input);
 
 	switch(command) {
-		case 1:	from = getMovingPawn(board, turn, input);
-				enPassant[turn] = findPawnMovingTwo(board, turn, input);
+		case 1:	from = getMovingPawn(board, turn, input, &enPassant[turn]);
 				break;
 		case 2:	from = getCapturingPawn(board, turn, input, enPassant);
 				break;
@@ -276,7 +258,6 @@ void trackCastle(char piece, int row, int col, int hasCastled[][2]) {
 	} else {
 		hasCastled[r][(col == 0) ? 0 : 1] = 1;
 	}
-
 }
 
 int getRow(char c) {
@@ -304,9 +285,11 @@ int isEnemy(char c, int turn) {
 		(turn == BLACK && c >= 'a' && c < 'z');
 }
 
-char *getMovingPawn(char board[][FILES], int turn, char *input) {
+char *getMovingPawn(char board[][FILES], int turn, char *input, 
+		char *enPassant) {
 	int row = getRow(input[1]);
 	int col = getColumn(input[0]);
+	*enPassant = 0;
 
 	if (board[row][col] == '.') {
 		if (turn == WHITE) { 
@@ -314,6 +297,7 @@ char *getMovingPawn(char board[][FILES], int turn, char *input) {
 			   return &board[row+1][col];
 			} else if (row == 4 && board[row+1][col] == '.' && 
 					board[6][col] == 'p') {
+				*enPassant = input[0];
 			   return &board[6][col];
 			}
 		} else {
@@ -321,6 +305,7 @@ char *getMovingPawn(char board[][FILES], int turn, char *input) {
 				return &board[row-1][col];
 			} else if (row == 3 && board[row-1][col] == '.' && 
 					board[1][col] == 'P') {
+				*enPassant = input[0];
 				return &board[1][col];
 			}
 		}
@@ -384,14 +369,11 @@ char *getPiece(char board[][FILES], int turn, char *input,
 	int col0 = -1;
 	int row1 = getRow(input[len-1]);
 	int col1 = getColumn(input[len-2]);
-	char piece = input[0];
+	char piece = (turn == WHITE) ? (input[0] + 32) : input[0];
 	char *square = 0;
 
 	if ((!isCapturing && board[row1][col1] == '.') ||
 			(isCapturing && isEnemy(board[row1][col1], turn))) {
-		if (turn == WHITE) {
-			piece += 32;
-		}
 
 		if ((len == 5 && !isCapturing) || (len == 6 && isCapturing)) {
 			row0 = getRow(input[1]);
@@ -427,36 +409,22 @@ char *getPiece(char board[][FILES], int turn, char *input,
 
 char *canPieceMove(char board[][FILES], char piece, int row0, int col0, 
 		int row1, int col1) {
-	switch(piece) {
-		case 'n':
-		case 'N':	
-		case 'k':
-		case 'K':	if (canMoveShortRanged(piece, row1-row0, col1-col0)) {
-						return &board[row0][col0];
-					}
-		case 'b':
-		case 'B':
-		case 'r':
-		case 'R':	
-		case 'q':
-		case 'Q':	if (canMoveLongRanged(board, row0, col0, row1, col1)) {
-						return &board[row0][col0];
-					}
+	if ((piece == 'n' || piece == 'N' || piece == 'k' || piece == 'K') &&
+		(canMoveShortRanged(piece, row1-row0, col1-col0))) {
+			return &board[row0][col0];
+	} else if (canMoveLongRanged(board, row0, col0, row1, col1)) {
+		return &board[row0][col0];
 	}
 
 	return 0;
 }
 
 int canMoveShortRanged(char piece, int rows, int cols) {
-	for (int i = 0; i < 8; i++) {
-		if (piece == 'n' || piece == 'N') {
-			if (rows == knightMoves[i][0] && cols == knightMoves[i][1]) {
-				return 1;
-			}
-		} else {
-			if (rows == direction[i][0] && cols == direction[i][1]) {
-				return 1;
-			}
+	int i = (piece == 'n' || piece == 'N') ? 1 : 0;
+
+	for (int j = 0; j < 8; j++) {
+		if (rows == direction[i][j][0] && cols == direction[i][j][1]) {
+			return 1;
 		}
 	}
 
@@ -481,97 +449,91 @@ int canMoveLongRanged(char board[][FILES], int row0, int col0, int row1,
 	return 1;
 }
 
-char *findPiece(char board[][FILES], char piece, int row, int col,
-		int hasCastled[][2]) {
-	char *square = 0;
-
-	switch (piece) {
-		case 'n':
-		case 'N':
-		case 'k':
-		case 'K':	return findShortRangedPiece(board, piece, row, col, 
-							hasCastled);
-		case 'b':
-		case 'B':
-		case 'r':
-		case 'R':	
-		case 'q':
-		case 'Q':	return findLongRangedPiece(board, piece, row, col, 
-							hasCastled);
-	}
-
-	return 0;
-}
-
-char *findShortRangedPiece(char board[][FILES], char piece, int row1, int col1,
+char *findPiece (char board[][FILES], char piece, int row1, int col1,
 		int hasCastled[][2]) {
 	int row0, col0, r, c;
 	int found = 0;
 	char *square = 0;
+	int i = (piece == 'N' || piece == 'n') ? 1 : 0;
+	int j = (piece == 'B' || piece == 'b') ? 1 : 0;
+	int inc = (piece == 'B' || piece == 'b' || piece == 'R' || piece == 'r') ? 
+		2 : 1;
 
-	for (int i = 0; i < 8; i++) {
-		if (piece == 'n' || piece == 'N') {
-			r = row1 + knightMoves[i][0];
-			c = col1 + knightMoves[i][1];
-		} else {
-			r = row1 + direction[i][0];
-			c = col1 + direction[i][1];
-		}
-
-		if (!isInBounds(r, c)) {
-			continue;
-		}
-		if (board[r][c] == piece) {
-			if (!found++) {
-				square = &board[r][c];
-				row0 = r;
-				col0 = c;
-			} else {
-				printf("Another piece found that can make that move.\n");
-				return 0;
-			}
-		}
-	}
-
-	if (square && (piece == 'K' || piece == 'k')) {
-		trackCastle(piece, row0, col0, hasCastled);
-	}
-
-	return square;
-}
-
-char *findLongRangedPiece (char board[][FILES], char piece, int row1, int col1,
-		int hasCastled[][2]) {
-	int row0, col0, r, c;
-	int found = 0;
-	char *square = 0;
-	int i = (piece == 'B' || piece == 'b') ? 1 : 0;
-	int inc = (piece == 'Q' || piece == 'q') ? 1: 2;
-
-	for (; i < 8; i += inc) {
-		r = row1 + direction[i][0];
-		c = col1 + direction[i][1];
+	for (; j < 8; j += inc) {
+		r = row1 + direction[i][j][0];
+		c = col1 + direction[i][j][1];
 
 		while (isInBounds(r, c) &&
 				(board[r][c] == piece || board[r][c] == '.')) {
 			if (board[r][c] == piece) {
 				if (!found++) {
-					square = &board[r][c];
-					row0 = r;
-					col0 = c;
+					square = &board[(row0=r)][(col0=c)];
 				} else {
 					printf("Another piece found that can make that move.\n");
 					return 0;
 				}
 			}
-			r += direction[i][0];
-			c += direction[i][1];
+			r += direction[i][j][0];
+			c += direction[i][j][1];
 		}
 	}
 
-	if (square && (piece == 'R' || piece == 'r')) {
+	if (square && (piece == 'R' || piece == 'r' || piece == 'K' || 
+			piece == 'k')) {
 		trackCastle(piece, row0, col0, hasCastled);
 	}
 
 	return square;
+}
+
+int isSafe(char board[][FILES], int turn, int row, int col) {
+	int r, c;
+
+	// pawns
+	if (turn == WHITE && row - 1 > 0 &&
+			((col - 1 >= 0 && board[row-1][col-1] == 'P') ||
+			(col + 1 <= 7 && board[row-1][col+1] == 'P'))) {
+		return 0;
+	} else if (turn == BLACK && row + 1 < 7 &&
+			((col - 1 >= 0 && board[row+1][col-1] == 'p') ||
+			(col + 1 <= 7 && board[row+1][col+1] == 'p'))) {
+		return 0;
+	}
+
+	// king, queen, bishops, rooks
+	for (int i = 0; i < 8; i++) {
+		r = row + direction[0][i][0];
+		c = col + direction[0][i][1];
+		if ((turn == WHITE && board[r][c] == 'K') ||
+				turn == BLACK && board[r][c] == 'k') {
+			return 0;
+		}
+		while (isInBounds(r, c)) {
+			if (board[r][c] == '.') {
+				continue;
+			}
+			if ((turn == WHITE && (board[r][c] == 'Q' || 
+					(i % 2 == 0 && board[r][c] == 'R') ||
+					(i % 2 == 1 && board[r][c] == 'B'))) ||
+					(turn == BLACK && (board[r][c] == 'q'||
+					(i % 2 == 0 && board[r][c] == 'r') ||
+					(i % 2 == 1 && board[r][c] == 'b')))) {
+				return 0;
+			}
+			r += direction[0][i][0];
+			c += direction[0][i][0];
+		}
+	}
+
+	// knights
+	for (int i = 0; i < 8; i++) {
+		r = row + direction[1][i][0];
+		c = col + direction[1][i][1];
+
+		if (board[r][c] == ((turn == WHITE) ? 'N' : 'n')) {
+			return 0;
+		}
+	}
+
+	return 1;
 }
