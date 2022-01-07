@@ -15,7 +15,8 @@ const int direction[][8][2] = {
 enum player{ WHITE, BLACK };
 
 void printBoard(char[][FILES]);
-int printResult(int, int, char *, char, int);
+int printResult(int, int, char *, char, int, int);
+void setupKings(char[][FILES], int[][2]);
 void askMove(int, char *);
 int validateInput(char *);
 int validatePawnMove(char *, int);
@@ -26,14 +27,15 @@ int isRank(char);
 int isAlgebraic(char);
 int isSquare(char *);
 int isInBounds(int, int);
-int canMove(char[][FILES], int, char *, int, char *, int[][2], int[][2], char *);
+int canMove(char[][FILES], int, char *, int, char *, int[][2], int[][2], 
+	char *);
 int canCastle(char[][FILES], int, int, int[][2]);
 void trackCastle(char, int, int, int[][2]);
 int getRow(char);
 int getColumn(char);
 void makeMove(char *, char *);
 int isEnemy(char, int);
-int isEnemy(char, int);
+int isOwn(char, int);
 char *canPieceMove(char[][MAX_CHAR], char, int, int, int, int);
 int canMoveShortRanged(char, int, int);
 int canMoveLongRanged(char[][MAX_CHAR], int, int, int, int);
@@ -44,20 +46,23 @@ int matchPiece(char[][FILES], char, int, int);
 char *getPiece(char[][FILES], int, char *, int[][2], int);
 char *findPiece(char[][FILES], char, int, int, int[][2]);
 int isCheck(char[][FILES], int, int, int, int);
-int isCheckMate(char[][FILES], int, int, int, int, int);
+int isCheckmate(char[][FILES], int, int, int, int, int);
 void copyBoard(char[][FILES], char[][FILES]);
+int isStalemate(char[][FILES], int, int, int, char *);
+int testPawnMove(char[][FILES], int, int, int, int, int, char *);
+int testPieceMove(char[][FILES], int, int, int, int, int);
 
 
 int main() {
 	char board[RANKS][FILES] = {
-		{'R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R'},
-		{'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P'},
 		{'.', '.', '.', '.', '.', '.', '.', '.'},
 		{'.', '.', '.', '.', '.', '.', '.', '.'},
+		{'p', 'r', '.', '.', '.', '.', '.', '.'},
+		{'.', '.', '.', '.', '.', 'K', '.', '.'},
 		{'.', '.', '.', '.', '.', '.', '.', '.'},
+		{'.', '.', '.', '.', '.', 'p', 'k', '.'},
+		{'R', '.', '.', '.', '.', '.', '.', '.'},
 		{'.', '.', '.', '.', '.', '.', '.', '.'},
-		{'p', 'p', 'p', 'p', 'p', 'p', 'p', 'p'},
-		{'r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'},
 	};
 
 	int turn = WHITE;
@@ -70,9 +75,12 @@ int main() {
 	int result;
 	int kings[][2] = {{7, 4}, {0, 4}};
 	char promotion = 0;
+	int checked = 0; 
+	int stalemated = 0;
 
 	while (isPlaying) {
 		printBoard(board);
+		setupKings(board, kings);
 		askMove(turn, input);
 
 		if (!strcmp(input, "quit")) {
@@ -86,9 +94,14 @@ int main() {
 			}
 
 			if (result) {
-				isPlaying = printResult(moves, turn, input, promotion, 
-					isCheck(board, turn^1, kings[turn^1][0], kings[turn^1][1], 
-					1));
+				checked = isCheck(board, turn^1, kings[turn^1][0], 
+					kings[turn^1][1], 1);
+				if (!checked) {
+					stalemated = isStalemate(board, turn^1, kings[turn^1][0],
+						kings[turn^1][1], enPassant);
+				}
+				isPlaying = printResult(moves, turn, input, promotion,
+					checked, stalemated); 
 				if (!isPlaying) {
 					printBoard(board);
 				}
@@ -132,7 +145,7 @@ void printBoard(char board[][FILES]) {
 }
 
 int printResult(int moves, int turn, char *input, char promotion, 
-		int checked) {
+		int checked, int stalemated) {
 	printf("%d.%s%s", moves, turn ? ".. " : " ", input);
 	if (promotion) {
 		printf("=%c", promotion);
@@ -141,11 +154,25 @@ int printResult(int moves, int turn, char *input, char promotion,
 	if (checked == -1) {
 		printf("\nCheckmate. %s\n", turn ? "0-1" : "1-0");
 		return 0;
-	} else if (checked == -2) {
+	} else if (stalemated) {
 		printf("\nStalemate. 1/2-1/2\n");
 		return 0;
 	}
 	return 1;
+}
+
+void setupKings(char board[][FILES], int kings[][2]) {
+	for (int i = 0; i < RANKS; i++) {
+		for (int j = 0; j < FILES; j++) {
+			if (board[i][j] == 'k'|| board[i][j] == 'K') {
+				kings[0][0] = i;
+				kings[0][1] = j;
+			} else if (board[i][j] == 'K') {
+				kings[1][0] = i;
+				kings[1][1] = j;
+			}
+		}
+	}
 }
 
 void askMove(int turn, char *reply) {
@@ -244,7 +271,7 @@ int canMove(char board[][FILES], int turn, char *input, int command,
 	int len = strlen(input);
 	char temp = 0;
 	char *captured = 0;
-	*promotion = 0;
+	promotion = 0;
 
 	switch(command) {
 		case 1:	from = getMovingPawn(board, turn, input, &enPassant[turn]);
@@ -273,6 +300,50 @@ int canMove(char board[][FILES], int turn, char *input, int command,
 					(turn == BLACK && input[len-1] == '1')) {
 				*promotion = promotePawn(to, turn);
 			}
+		}
+		if (isCheck(board, turn, kings[turn][0], kings[turn][1], 0)) {
+			printf("Move puts own king in check.\n");
+			makeMove(from, to);
+			*to = temp;
+			if (captured) {
+				*captured = turn ? 'P' : 'p';
+			}
+			if (promotion) {
+				*to = turn ? 'P' : 'p';
+			}
+			return 0;
+		}
+
+		return 1;
+	}
+	
+	return 0;
+}
+
+int canMovePawn(char board[][FILES], int turn, char *input, int command, 
+		char *enPassant, int kings[][2], char *promotion) {
+	char *to, *from;
+	int len = strlen(input);
+	char temp = 0;
+	char *captured = 0;
+	*promotion = 0;
+
+	if (command == 1) {
+		from = getMovingPawn(board, turn, input, &enPassant[turn]);
+	} else {
+		from = getCapturingPawn(board, turn, input, enPassant, captured);
+	}
+
+	if (from) {
+		to = &board[getRow(input[len-1])][getColumn(input[len-2])];
+		temp = *to;
+		makeMove(to, from);
+		if (captured) {
+			*captured = '.';
+		}
+		if ((turn == WHITE && input[len-1] == '8') ||
+				(turn == BLACK && input[len-1] == '1')) {
+			*promotion = promotePawn(to, turn);
 		}
 		if (isCheck(board, turn, kings[turn][0], kings[turn][1], 0)) {
 			printf("Move puts own king in check.\n");
@@ -363,8 +434,8 @@ int isEnemy(char c, int turn) {
 }
 
 int isOwn(char c, int turn) {
-	return (turn == WHITE && c >= 'a' && c < 'z') ||
-		(turn == BLACK && c >= 'A' && c < 'Z');
+	return (turn == BLACK && c >= 'A' && c < 'Z') ||
+		(turn == WHITE && c >= 'a' && c < 'z');
 }
 
 char *getMovingPawn(char board[][FILES], int turn, char *input, 
@@ -595,7 +666,7 @@ int isCheck(char board[][FILES], int turn, int row, int col, int mateCheck) {
 				(col + 1 <= 7 && board[(atkRow)][(atkCol=col+1)] == pawn)) {
 			if (!mateCheck) {
 				return (atkRow * RANKS) + atkCol + 1;
-			} else if (isCheckMate(board, turn, row, col, atkRow, atkCol)) {
+			} else if (isCheckmate(board, turn, row, col, atkRow, atkCol)) {
 				return -1;
 			}
 			checked++;
@@ -615,11 +686,15 @@ int isCheck(char board[][FILES], int turn, int row, int col, int mateCheck) {
 				if (*square != '.') {
 					if ((i == 0 &&
 							((turn == WHITE && 
-							(*square == 'Q' || *square == 'K' ||
+							(*square == 'Q' || 
+							(*square == 'K' &&
+							canMoveShortRanged('K', row-r, col-c)) ||
 							(j % 2 == 0 && *square == 'R') ||
 							(j % 2 == 1 && *square == 'B'))) ||
 							(turn == BLACK && 
-							(*square == 'q'|| *square == 'k' ||
+							(*square == 'q'|| 
+							(*square == 'k' &&
+							canMoveShortRanged('K', row-r, col-c)) ||
 							(j % 2 == 0 && *square == 'r') ||
 							(j % 2 == 1 && *square == 'b'))))) ||
 							(i == 1 &&
@@ -635,7 +710,7 @@ int isCheck(char board[][FILES], int turn, int row, int col, int mateCheck) {
 								}
 							}
 							return (r * RANKS) + c + 1;
-						} else if (isCheckMate(board, turn, row, col, r, c)) {
+						} else if (isCheckmate(board, turn, row, col, r, c)) {
 							return -1;
 						}
 						checked++;
@@ -655,7 +730,7 @@ int isCheck(char board[][FILES], int turn, int row, int col, int mateCheck) {
 	return checked;
 }
 
-int isCheckMate(char board[][FILES], int turn, int kRow, int kCol, 
+int isCheckmate(char board[][FILES], int turn, int kRow, int kCol, 
 		int atkRow, int atkCol) {
 	int i, j, r, c, square, difRow, difCol;
 	char tester[RANKS][FILES];
@@ -713,4 +788,114 @@ void copyBoard(char to[][FILES], char from[][FILES]) {
 			to[i][j] = from[i][j];
 		}
 	}
+}
+
+int isStalemate(char board[][FILES], int turn, int kRow, int kCol, 
+		char *enPassant) {
+	char piece;
+
+	for (int i = 0; i < RANKS; i++) {
+		for (int j = 0; j < FILES; j++) {
+			if (isOwn(board[i][j], turn)) {
+				piece = board[i][j];
+				if (((piece == 'p' || piece == 'P') &&
+						testPawnMove(board, turn, i, j, kRow, kCol, 
+						enPassant)) ||
+						(piece != 'p' && piece != 'P' &&
+						 testPieceMove(board, turn, i, j, kRow, kCol))) {
+					return 0;
+				}
+			}
+		}
+	}
+
+	return 1;
+}
+
+int testPawnMove(char board[][FILES], int turn, int row, int col, int kRow,
+		int kCol, char *enPassant) {
+	char r, c;
+	char piece = board[row][col];
+	char tester[RANKS][FILES];
+	int dir = turn ? 1 : -1;
+	char enemyPawn = turn ? 'p' : 'P';
+
+	if (isInBounds(row+dir, col) && board[row+dir][col] == '.') {
+		r = row + dir;
+		copyBoard(tester, board);
+		makeMove(&tester[r][col], &tester[r][col]);
+		if (!isCheck(tester, turn, kRow, kCol, 0)) {
+			return 1;
+		}
+	}
+
+	for (int i = -1; i < 2; i += 2) {
+		r = row + dir;
+		c = col + i;
+		if (isInBounds(r, c) && (isEnemy(board[r][c], turn) ||
+				(board[r][c] == '.' && board[row][c] == enemyPawn &&
+				enPassant[turn^1] == getRank(c)))) {
+			copyBoard(tester, board);
+			makeMove(&tester[r][col], &tester[r][col]);
+			if (!isCheck(tester, turn, kRow, kCol, 0)) {
+				return 1;
+			}
+		}
+	}
+
+	return 0;
+}
+
+int testPieceMove(char board[][FILES], int turn, int row, int col, int kRow,
+		int kCol) {
+	int i, j, inc, r, c;
+	char piece = board[row][col];
+	char tester[RANKS][FILES];
+
+	switch (piece) {
+		case 'n':
+		case 'N':	i = 1;
+					j = 0;
+					inc = 1;
+					break;
+		case 'b':
+		case 'B':	i = 0;
+					j = 1;
+					inc = 2;
+					break;
+		case 'r':
+		case 'R':	i = 0;
+					j = 0;
+					inc = 2;
+					break;
+		case 'q':
+		case 'Q':	i = 0;
+					j = 0;
+					inc = 1;
+					break;
+		case 'k':
+		case 'K':	i = 0;
+					j = 0;
+					inc = 1;
+					break;
+	}
+
+	for (; j < 8; j += inc) {
+		r = row + direction[i][j][0];
+		c = col + direction[i][j][1];
+		if (isInBounds(r, c) && board[r][c] == '.') {
+			copyBoard(tester, board);
+			makeMove(&tester[r][c], &tester[row][col]);
+			if (piece == 'k' || piece == 'K') {
+				kRow = r;
+				kCol = c;
+			}
+			printBoard(tester);
+			if (!isCheck(tester, turn, kRow, kCol, 0)) {
+				return 1;
+			}
+		}
+	}
+
+	return 0;
 }
