@@ -49,6 +49,12 @@ void copyBoard(char[][FILES], char[][FILES]);
 int isStalemate(char[][FILES], int, int, int, char *);
 int testPawnMove(char[][FILES], int, int, int, int, int, char *);
 int testPieceMove(char[][FILES], int, int, int, int, int);
+int isKing(char);
+int isQueen(char);
+int isRook(char);
+int isBishop(char);
+int isKnight(char);
+int isPawn(char);
 
 
 int main() {
@@ -279,7 +285,7 @@ int canMove(char board[][FILES], int turn, char *input, int command,
 	}
 
 	if (from) {
-		if (input[0] == 'k' || input[0] == 'K') {
+		if (isKing(input[0])) {
 			kings[turn][0] = getRow(input[len-1]);
 			kings[turn][1] = getColumn(input[len-2]);
 		}
@@ -294,50 +300,6 @@ int canMove(char board[][FILES], int turn, char *input, int command,
 					(turn == BLACK && input[len-1] == '1')) {
 				*promotion = promotePawn(to, turn);
 			}
-		}
-		if (isCheck(board, turn, kings[turn][0], kings[turn][1], 0)) {
-			printf("Move puts own king in check.\n");
-			makeMove(from, to);
-			*to = temp;
-			if (captured) {
-				*captured = turn ? 'P' : 'p';
-			}
-			if (promotion) {
-				*to = turn ? 'P' : 'p';
-			}
-			return 0;
-		}
-
-		return 1;
-	}
-	
-	return 0;
-}
-
-int canMovePawn(char board[][FILES], int turn, char *input, int command, 
-		char *enPassant, int kings[][2], char *promotion) {
-	char *to, *from;
-	int len = strlen(input);
-	char temp = 0;
-	char *captured = 0;
-	*promotion = 0;
-
-	if (command == 1) {
-		from = getMovingPawn(board, turn, input, &enPassant[turn]);
-	} else {
-		from = getCapturingPawn(board, turn, input, enPassant, captured);
-	}
-
-	if (from) {
-		to = &board[getRow(input[len-1])][getColumn(input[len-2])];
-		temp = *to;
-		makeMove(to, from);
-		if (captured) {
-			*captured = '.';
-		}
-		if ((turn == WHITE && input[len-1] == '8') ||
-				(turn == BLACK && input[len-1] == '1')) {
-			*promotion = promotePawn(to, turn);
 		}
 		if (isCheck(board, turn, kings[turn][0], kings[turn][1], 0)) {
 			printf("Move puts own king in check.\n");
@@ -565,7 +527,7 @@ char *getPiece(char board[][FILES], int turn, char *input,
 
 char *canPieceMove(char board[][FILES], char piece, int row0, int col0, 
 		int row1, int col1) {
-	if ((piece == 'n' || piece == 'N' || piece == 'k' || piece == 'K') &&
+	if ((isKnight(piece) || isKing(piece)) &&
 		(canMoveShortRanged(piece, row1-row0, col1-col0))) {
 			return &board[row0][col0];
 	} else if (canMoveLongRanged(board, row0, col0, row1, col1)) {
@@ -577,7 +539,7 @@ char *canPieceMove(char board[][FILES], char piece, int row0, int col0,
 }
 
 int canMoveShortRanged(char piece, int rows, int cols) {
-	int i = (piece == 'n' || piece == 'N') ? 1 : 0;
+	int i = (isKnight(piece)) ? 1 : 0;
 
 	for (int j = 0; j < 8; j++) {
 		if (rows == direction[i][j][0] && cols == direction[i][j][1]) {
@@ -609,10 +571,9 @@ char *findPiece (char board[][FILES], char piece, int row1, int col1,
 	int row0, col0, r, c;
 	int found = 0;
 	char *square = 0;
-	int i = (piece == 'N' || piece == 'n') ? 1 : 0;
-	int j = (piece == 'B' || piece == 'b') ? 1 : 0;
-	int inc = (piece == 'B' || piece == 'b' || piece == 'R' || piece == 'r') ? 
-		2 : 1;
+	int i = isKnight(piece) ? 1 : 0;
+	int j = isBishop(piece) ? 1 : 0;
+	int inc = (isBishop(piece) || isRook(piece)) ? 2 : 1;
 
 	for (; j < 8; j += inc) {
 		r = row1 + direction[i][j][0];
@@ -628,7 +589,7 @@ char *findPiece (char board[][FILES], char piece, int row1, int col1,
 					return 0;
 				}
 			}
-			if (piece == 'N' || piece == 'n' || piece == 'K' || piece == 'k') {
+			if (isKnight(piece) || isKing(piece)) {
 				break;
 			}
 			r += direction[i][j][0];
@@ -636,8 +597,7 @@ char *findPiece (char board[][FILES], char piece, int row1, int col1,
 		}
 	}
 
-	if (square && (piece == 'R' || piece == 'r' || piece == 'K' || 
-			piece == 'k')) {
+	if (square && (isRook(piece) || isKing(piece))) {
 		trackCastle(piece, row0, col0, hasCastled);
 	}
 
@@ -751,9 +711,8 @@ int isCheckmate(char board[][FILES], int turn, int kRow, int kCol,
 	}
 
 	// check if attacking piece (bishops, rooks, queen) can be blocked instead
-	if (board[atkRow][atkCol] == 'B' || board[atkRow][atkCol] == 'b' ||
-			board[atkRow][atkCol] == 'R' || board[atkRow][atkCol] == 'r' ||
-			board[atkRow][atkCol] == 'Q' || board[atkRow][atkCol] == 'q') {
+	if (isBishop(board[atkRow][atkCol]) || isRook(board[atkRow][atkCol]) ||
+			isQueen(board[atkRow][atkCol])) {
 		copyBoard(tester, board);
 
 		//check path between attacker and king
@@ -792,11 +751,11 @@ int isStalemate(char board[][FILES], int turn, int kRow, int kCol,
 		for (int j = 0; j < FILES; j++) {
 			if (isOwn(board[i][j], turn)) {
 				piece = board[i][j];
-				if (((piece == 'p' || piece == 'P') &&
+				if ((isPawn(piece) &&
 						testPawnMove(board, turn, i, j, kRow, kCol, 
 						enPassant)) ||
-						(piece != 'p' && piece != 'P' &&
-						 testPieceMove(board, turn, i, j, kRow, kCol))) {
+						(!isPawn(piece) &&
+						testPieceMove(board, turn, i, j, kRow, kCol))) {
 					return 0;
 				}
 			}
@@ -846,10 +805,9 @@ int testPieceMove(char board[][FILES], int turn, int row, int col, int kRow,
 	char piece = board[row][col];
 	char tester[RANKS][FILES];
 
-	i = (piece == 'n' || piece == 'N') ? 1 : 0;
-	j = (piece == 'b' || piece == 'B') ? 1 : 0;
-	inc = (piece == 'b' || piece == 'B' || piece == 'r' || piece == 'R') ? 
-		2 : 1;
+	i = (isKnight(piece)) ? 1 : 0;
+	j = (isBishop(piece)) ? 1 : 0;
+	inc = (isBishop(piece) || isRook(piece)) ? 2 : 1;
 
 	for (; j < 8; j += inc) {
 		r = row + direction[i][j][0];
@@ -857,7 +815,7 @@ int testPieceMove(char board[][FILES], int turn, int row, int col, int kRow,
 		if (isInBounds(r, c) && board[r][c] == '.') {
 			copyBoard(tester, board);
 			makeMove(&tester[r][c], &tester[row][col]);
-			if (piece == 'k' || piece == 'K') {
+			if (isKing(piece)) {
 				kRow = r;
 				kCol = c;
 			}
@@ -868,4 +826,28 @@ int testPieceMove(char board[][FILES], int turn, int row, int col, int kRow,
 	}
 
 	return 0;
+}
+
+int isKing(char c) {
+	return c == 'k' || c == 'K';
+}
+
+int isQueen(char c) {
+	return c == 'q' || c == 'Q';
+}
+
+int isRook(char c) {
+	return c == 'r' || c == 'R';
+}
+
+int isBishop(char c) {
+	return c == 'b' || c == 'B';
+}
+
+int isKnight(char c) {
+	return c == 'n' || c == 'N';
+}
+
+int isPawn(char c) {
+	return c == 'p' || c == 'P';
 }
