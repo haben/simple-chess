@@ -4,7 +4,6 @@
 #define RANKS 8
 #define FILES 8
 #define MAX_CHAR 8
-#define MAX_PIECES 16
 
 const char *pieces = "KQRBN";
 const int direction[][8][2] = {
@@ -25,7 +24,6 @@ int validateCastling(char *);
 int isFile(char);
 int isRank(char);
 int isAlgebraic(char);
-int isSquare(char *);
 int isInBounds(int, int);
 int canMove(char[][FILES], int, char *, int, char *, int[][2], int[][2], 
 	char *);
@@ -55,14 +53,14 @@ int testPieceMove(char[][FILES], int, int, int, int, int);
 
 int main() {
 	char board[RANKS][FILES] = {
+		{'R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R'},
+		{'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P'},
 		{'.', '.', '.', '.', '.', '.', '.', '.'},
 		{'.', '.', '.', '.', '.', '.', '.', '.'},
-		{'p', 'r', '.', '.', '.', '.', '.', '.'},
-		{'.', '.', '.', '.', '.', 'K', '.', '.'},
 		{'.', '.', '.', '.', '.', '.', '.', '.'},
-		{'.', '.', '.', '.', '.', 'p', 'k', '.'},
-		{'R', '.', '.', '.', '.', '.', '.', '.'},
 		{'.', '.', '.', '.', '.', '.', '.', '.'},
+		{'p', 'p', 'p', 'p', 'p', 'p', 'p', 'p'},
+		{'r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'},
 	};
 
 	int turn = WHITE;
@@ -164,7 +162,7 @@ int printResult(int moves, int turn, char *input, char promotion,
 void setupKings(char board[][FILES], int kings[][2]) {
 	for (int i = 0; i < RANKS; i++) {
 		for (int j = 0; j < FILES; j++) {
-			if (board[i][j] == 'k'|| board[i][j] == 'K') {
+			if (board[i][j] == 'k') {
 				kings[0][0] = i;
 				kings[0][1] = j;
 			} else if (board[i][j] == 'K') {
@@ -193,7 +191,7 @@ int validateInput(char *str) {
 
 	if ((c = str[0]) == '0' || c == 'o' || c == 'O') {	// "oO0" - castling
 		return validateCastling(str);
-	} else if (isSquare(&str[len-2])) {
+	} else if (isFile(str[len-2]) && isRank(str[len-1])) {
 		if (isFile(c)) {	// "abcdefgh" - pawn move
 			return validatePawnMove(str, len);
 		} else {	// "NBRQK" - piece move
@@ -254,10 +252,6 @@ int isRank(char c) {
 
 int isAlgebraic(char c) {
 	return (c >= 'a' && c <= 'h') || (c >= '1' && c<= '8');
-}
-
-int isSquare(char *str) {
-	return str[0] >= 'a' && str[0] <= 'h' && str[1] >= '1' && str[1] <= '8';
 }
 
 int isInBounds(int m, int n) {
@@ -852,33 +846,10 @@ int testPieceMove(char board[][FILES], int turn, int row, int col, int kRow,
 	char piece = board[row][col];
 	char tester[RANKS][FILES];
 
-	switch (piece) {
-		case 'n':
-		case 'N':	i = 1;
-					j = 0;
-					inc = 1;
-					break;
-		case 'b':
-		case 'B':	i = 0;
-					j = 1;
-					inc = 2;
-					break;
-		case 'r':
-		case 'R':	i = 0;
-					j = 0;
-					inc = 2;
-					break;
-		case 'q':
-		case 'Q':	i = 0;
-					j = 0;
-					inc = 1;
-					break;
-		case 'k':
-		case 'K':	i = 0;
-					j = 0;
-					inc = 1;
-					break;
-	}
+	i = (piece == 'n' || piece == 'N') ? 1 : 0;
+	j = (piece == 'b' || piece == 'B') ? 1 : 0;
+	inc = (piece == 'b' || piece == 'B' || piece == 'r' || piece == 'R') ? 
+		2 : 1;
 
 	for (; j < 8; j += inc) {
 		r = row + direction[i][j][0];
@@ -890,7 +861,6 @@ int testPieceMove(char board[][FILES], int turn, int row, int col, int kRow,
 				kRow = r;
 				kCol = c;
 			}
-			printBoard(tester);
 			if (!isCheck(tester, turn, kRow, kCol, 0)) {
 				return 1;
 			}
